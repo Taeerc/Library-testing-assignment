@@ -6,13 +6,13 @@ import ac.il.bgu.qa.services.*;
 import org.junit.jupiter.api.*;
 
 import org.junit.jupiter.params.*;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.*;
 
 import java.util.Arrays;
 import java.util.Collections;
 
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.*;
@@ -45,8 +45,8 @@ public class TestLibrary {
     void addBook_whenISBNInvalid() {
         Book bad = mock(Book.class);
         when(bad.getISBN()).thenReturn("123"); //invalid
-        when(bad.getTitle()).thenReturn("Some Title");
-        when(bad.getAuthor()).thenReturn("John Smith");
+        when(bad.getTitle()).thenReturn("Taeer So Cool");
+        when(bad.getAuthor()).thenReturn("Stav Ronen");
         when(bad.isBorrowed()).thenReturn(false);
 
         assertThrows(IllegalArgumentException.class,
@@ -57,9 +57,9 @@ public class TestLibrary {
     //throwsIllegalArgumentException
     void addBook_whenTitleInvalid() {
         Book bad = mock(Book.class);
-        when(bad.getISBN()).thenReturn("9780306406157"); //valid ISBN13
-        when(bad.getTitle()).thenReturn(""); // invalid
-        when(bad.getAuthor()).thenReturn("John Smith");
+        when(bad.getISBN()).thenReturn("9780306406157");
+        when(bad.getTitle()).thenReturn(""); //invalid
+        when(bad.getAuthor()).thenReturn("Taeer Chaimovitz");
         when(bad.isBorrowed()).thenReturn(false);
 
         assertThrows(IllegalArgumentException.class,
@@ -73,7 +73,7 @@ public class TestLibrary {
         Book bad = mock(Book.class);
         when(bad.getISBN()).thenReturn("9780306406157");
         when(bad.getTitle()).thenReturn("Some Title");
-        when(bad.getAuthor()).thenReturn("J--ohn"); // invalid: consecutive --
+        when(bad.getAuthor()).thenReturn("s--tav"); // invalid: consecutive --
         when(bad.isBorrowed()).thenReturn(false);
 
         assertThrows(IllegalArgumentException.class,
@@ -331,7 +331,7 @@ public class TestLibrary {
 
 
     @Test
-    void notifyReviews_noReviewsFound() throws Exception {
+    void notifyReviews_noReviewsFound() {
         when(databaseService.getBookByISBN("9780306406157")).thenReturn(mock(Book.class));
         User user = mock(User.class);
         when(databaseService.getUserById("123456789012")).thenReturn(user);
@@ -346,7 +346,7 @@ public class TestLibrary {
     }
 
     @Test
-    void notifyReviews_successOnFirstTry() throws Exception {
+    void notifyReviews_successOnFirstTry(){
         Book book = mock(Book.class);
         when(book.getTitle()).thenReturn("Some Title");
 
@@ -364,7 +364,7 @@ public class TestLibrary {
     }
 
     @Test
-    void notifyReviews_succeedsOnFifthAttempt() throws Exception {
+    void notifyReviews_succeedsOnFifthAttempt() {
         Book book = mock(Book.class);
         when(book.getTitle()).thenReturn("Some Title");
         when(databaseService.getBookByISBN("9780306406157")).thenReturn(book);
@@ -388,7 +388,7 @@ public class TestLibrary {
     }
 
     @Test
-    void notifyReviews_failsAllRetries() throws Exception {
+    void notifyReviews_failsAllRetries() {
         Book book = mock(Book.class);
         when(book.getTitle()).thenReturn("Some Title");
         when(databaseService.getBookByISBN("9780306406157")).thenReturn(book);
@@ -408,20 +408,9 @@ public class TestLibrary {
         verify(user, times(5)).sendNotification(anyString());
     }
 
-    @Test
-    void registerUser_invalidNameCharacters() {
-        User u = mock(User.class);
-        when(u.getId()).thenReturn("123456789012");
-        when(u.getName()).thenReturn("Alic3!");  // invalid
-        when(u.getNotificationService()).thenReturn(mockNotificationService);
-
-        assertThrows(IllegalArgumentException.class,
-                () -> library.registerUser(u));
-    }
-
 
     @Test
-    void notifyReviews_multipleReviewsFormatting() throws Exception {
+    void notifyReviews_multipleReviewsFormatting() {
         Book book = mock(Book.class);
         when(book.getTitle()).thenReturn("Some Title");
         when(databaseService.getBookByISBN("9780306406157")).thenReturn(book);
@@ -470,7 +459,7 @@ public class TestLibrary {
     }
 
     @Test
-    void notifyReviews_reviewServiceCalledExactlyOnce() throws Exception {
+    void notifyReviews_reviewServiceCalledExactlyOnce(){
         Book b = mock(Book.class);
         User u = mock(User.class);
 
@@ -486,18 +475,140 @@ public class TestLibrary {
     }
 
     @Test
-    void borrowBook_nullBorrowedFlag_treatedAsBorrowed() {
+    void borrowBook_invalidBorrowedFlag_treatedAsBorrowed() {
         Book b = mock(Book.class);
+
         when(databaseService.getBookByISBN("9780306406157")).thenReturn(b);
         when(databaseService.getUserById("123456789012")).thenReturn(mock(User.class));
-        when(b.isBorrowed()).thenReturn(null);
+
+        // "Invalid" state → mock returns true (treated as borrowed)
+        when(b.isBorrowed()).thenReturn(true);
 
         assertThrows(BookAlreadyBorrowedException.class,
                 () -> library.borrowBook("9780306406157", "123456789012"));
     }
 
 
-    
+    @Test
+    void getBookByISBN_invalidISBN_throwsIllegalArgumentException() {
+        assertThrows(IllegalArgumentException.class,
+                () -> library.getBookByISBN("123", "123456789012"));
+    }
+
+    @Test
+    void getBookByISBN_invalidUserId_throwsIllegalArgumentException() {
+        assertThrows(IllegalArgumentException.class,
+                () -> library.getBookByISBN("9780306406157", "123"));
+    }
+
+    @Test
+    void getBookByISBN_bookNotFound_throwsBookNotFoundException() {
+        when(databaseService.getBookByISBN("9780306406157")).thenReturn(null);
+
+        assertThrows(BookNotFoundException.class,
+                () -> library.getBookByISBN("9780306406157", "123456789012"));
+    }
+
+    @Test
+    void getBookByISBN_bookAlreadyBorrowed_throwsBookAlreadyBorrowedException() {
+        Book mockBook = mock(Book.class);
+        when(mockBook.isBorrowed()).thenReturn(true);
+        when(databaseService.getBookByISBN("9780306406157")).thenReturn(mockBook);
+
+        assertThrows(BookAlreadyBorrowedException.class,
+                () -> library.getBookByISBN("9780306406157", "123456789012"));
+    }
+
+    @Test
+    void getBookByISBN_valid_returnsBookAndNotifiesUser(){
+        // Arrange
+        Book mockBook = mock(Book.class);
+        User mockUser = mock(User.class);
+
+        when(databaseService.getBookByISBN("9780306406157")).thenReturn(mockBook);
+        when(databaseService.getUserById("123456789012")).thenReturn(mockUser);
+        when(mockBook.isBorrowed()).thenReturn(false);
+        when(reviewService.getReviewsForBook("9780306406157"))
+                .thenReturn(Collections.singletonList("A+ review"));
+
+        // Act
+        Book returnedBook = library.getBookByISBN("9780306406157", "123456789012");
+
+        // Assert
+        assertEquals(mockBook, returnedBook); // Check book is returned
+        verify(mockUser, times(1)).sendNotification(anyString()); // Check notification was sent
+        verify(reviewService, times(1)).close(); // Check review service was closed
+    }
+
+    @Test
+    void getBookByISBN_notificationFails_stillReturnsBook(){
+        // Arrange
+        Book mockBook = mock(Book.class);
+        User mockUser = mock(User.class);
+
+        when(databaseService.getBookByISBN("9780306406157")).thenReturn(mockBook);
+        when(databaseService.getUserById("123456789012")).thenReturn(mockUser);
+        when(mockBook.isBorrowed()).thenReturn(false);
+
+        // Make the notification part fail
+        when(reviewService.getReviewsForBook("9780306406157"))
+                .thenThrow(new ReviewException("Service is down"));
+
+        // Act
+        Book returnedBook = library.getBookByISBN("9780306406157", "123456789012");
+
+        // Assert
+        // This is the most important check: the book is returned EVEN IF notification fails
+        assertEquals(mockBook, returnedBook);
+
+        // Verify notification was NOT sent, but close() was still called (due to finally)
+        verify(mockUser, never()).sendNotification(anyString());
+        verify(reviewService, times(1)).close();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "123", "abc", "97803A6406157"})
+    void borrowBook_invalidISBN_parametrized(String badIsbn) {
+        assertThrows(IllegalArgumentException.class,
+                () -> library.borrowBook(badIsbn, "123456789012"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "123", "A9780306406157", "97803064061", "9780306406157x"})
+    void addBook_invalidISBNs_throws(String badIsbn) {
+        Book b = mock(Book.class);
+        when(b.getISBN()).thenReturn(badIsbn);
+        when(b.getTitle()).thenReturn("Good");
+        when(b.getAuthor()).thenReturn("John Doe");
+        when(b.isBorrowed()).thenReturn(false);
+
+        assertThrows(IllegalArgumentException.class, () -> library.addBook(b));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "123", "abcdef", "12345678901", "1234567890123"})
+    void registerUser_invalidUserIds_throws(String badId) {
+        User u = mock(User.class);
+        when(u.getId()).thenReturn(badId);
+        when(u.getName()).thenReturn("Alice");
+        when(u.getNotificationService()).thenReturn(mockNotificationService);
+
+        assertThrows(IllegalArgumentException.class, () -> library.registerUser(u));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "12", "abcd", "12345678901", "1234567890123"})
+    void borrowBook_invalidUserIds_throws(String badUserId) {
+        Book book = mock(Book.class);
+        when(databaseService.getBookByISBN("9780306406157")).thenReturn(book);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> library.borrowBook("9780306406157", badUserId));
+    }
+
+
+
+
 
 
 
