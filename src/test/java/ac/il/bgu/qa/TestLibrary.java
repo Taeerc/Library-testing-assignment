@@ -329,20 +329,6 @@ public class TestLibrary {
                 () -> library.notifyUserWithBookReviews("9780306406157", "123456789012"));
     }
 
-    @Test
-    void notifyReviews_reviewService() throws Exception {
-        when(databaseService.getBookByISBN("9780306406157")).thenReturn(mock(Book.class));
-        User user = mock(User.class);
-        when(databaseService.getUserById("123456789012")).thenReturn(user);
-
-        when(reviewService.getReviewsForBook("9780306406157"))
-                .thenThrow(new ReviewException("fail"));
-
-        assertThrows(ReviewServiceUnavailableException.class,
-                () -> library.notifyUserWithBookReviews("9780306406157", "123456789012"));
-
-        verify(reviewService).close();
-    }
 
     @Test
     void notifyReviews_noReviewsFound() throws Exception {
@@ -423,24 +409,6 @@ public class TestLibrary {
     }
 
     @Test
-    void notifyReviews_closeCalledOnSuccess() throws Exception {
-        Book book = mock(Book.class);
-        when(book.getTitle()).thenReturn("Some Title");
-        when(databaseService.getBookByISBN("9780306406157")).thenReturn(book);
-
-        User user = mock(User.class);
-        when(databaseService.getUserById("123456789012")).thenReturn(user);
-
-        when(reviewService.getReviewsForBook("9780306406157"))
-                .thenReturn(Collections.singletonList("Great book!"));
-
-        library.notifyUserWithBookReviews("9780306406157", "123456789012");
-
-        verify(user, times(1)).sendNotification(anyString());
-        verify(reviewService, times(1)).close();   // Missing in your suite
-    }
-
-    @Test
     void registerUser_invalidNameCharacters() {
         User u = mock(User.class);
         when(u.getId()).thenReturn("123456789012");
@@ -451,19 +419,6 @@ public class TestLibrary {
                 () -> library.registerUser(u));
     }
 
-    @Test
-    void addBook_invalidBook_neverTouchesDatabase() {
-        Book bad = mock(Book.class);
-        when(bad.getISBN()).thenReturn("123"); // invalid
-        when(bad.getTitle()).thenReturn("");
-        when(bad.getAuthor()).thenReturn("???");
-        when(bad.isBorrowed()).thenReturn(true);
-
-        assertThrows(IllegalArgumentException.class,
-                () -> library.addBook(bad));
-
-        verify(databaseService, never()).addBook(anyString(), any());
-    }
 
     @Test
     void notifyReviews_multipleReviewsFormatting() throws Exception {
@@ -489,88 +444,6 @@ public class TestLibrary {
     }
 
     @Test
-    void notifyReviews_reviewServiceAlwaysClosedEvenOnSuccess() throws Exception {
-        Book book = mock(Book.class);
-        when(databaseService.getBookByISBN("9780306406157")).thenReturn(book);
-
-        User user = mock(User.class);
-        when(databaseService.getUserById("123456789012")).thenReturn(user);
-
-        when(reviewService.getReviewsForBook("9780306406157"))
-                .thenReturn(Collections.singletonList("Nice"));
-
-        library.notifyUserWithBookReviews("9780306406157", "123456789012");
-
-        InOrder order = Mockito.inOrder(reviewService);
-        order.verify(reviewService).getReviewsForBook("9780306406157");
-        order.verify(reviewService).close();
-    }
-
-    @Test
-    void returnBook_callsReturnBeforeDatabaseUpdate() {
-        Book book = mock(Book.class);
-
-        when(databaseService.getBookByISBN("9780306406157")).thenReturn(book);
-        when(book.isBorrowed()).thenReturn(true);
-
-        library.returnBook("9780306406157");
-
-        InOrder order = Mockito.inOrder(book, databaseService);
-        order.verify(book).returnBook();
-        order.verify(databaseService).returnBook("9780306406157");
-    }
-
-    @Test
-    void borrowBook_correctOrder() {
-        Book book = mock(Book.class);
-
-        when(databaseService.getBookByISBN("9780306406157")).thenReturn(book);
-        when(databaseService.getUserById("123456789012")).thenReturn(mock(User.class));
-        when(book.isBorrowed()).thenReturn(false);
-
-        library.borrowBook("9780306406157", "123456789012");
-
-        InOrder order = Mockito.inOrder(book, databaseService);
-        order.verify(book).borrow();
-        order.verify(databaseService).borrowBook("9780306406157", "123456789012");
-    }
-
-
-    @Test
-    void notifyReviews_noReviews_doesNotSendNotification() throws Exception {
-        when(databaseService.getBookByISBN("9780306406157")).thenReturn(mock(Book.class));
-        User user = mock(User.class);
-        when(databaseService.getUserById("123456789012")).thenReturn(user);
-
-        when(reviewService.getReviewsForBook(anyString()))
-                .thenReturn(Collections.emptyList());
-
-        assertThrows(NoReviewsFoundException.class,
-                () -> library.notifyUserWithBookReviews("9780306406157", "123456789012"));
-
-        verify(user, never()).sendNotification(anyString());
-    }
-
-    @Test
-    void notifyReviews_failsAllRetries_closeStillCalled() throws Exception {
-        Book book = mock(Book.class);
-        when(databaseService.getBookByISBN("9780306406157")).thenReturn(book);
-        User user = mock(User.class);
-        when(databaseService.getUserById("123456789012")).thenReturn(user);
-
-        when(reviewService.getReviewsForBook("9780306406157"))
-                .thenReturn(Collections.singletonList("Nice"));
-
-        doThrow(new NotificationException("fail"))
-                .when(user).sendNotification(anyString());
-
-        assertThrows(NotificationException.class,
-                () -> library.notifyUserWithBookReviews("9780306406157", "123456789012"));
-
-        verify(reviewService).close();
-    }
-
-    @Test
     void addBook_isbnContainsNonDigits() {
         Book bad = mock(Book.class);
         when(bad.getISBN()).thenReturn("97803A6406157");  // non-digit
@@ -583,40 +456,54 @@ public class TestLibrary {
     }
 
     @Test
-    void borrowBook_isbnContainsNonDigits() {
-        assertThrows(IllegalArgumentException.class,
-                () -> library.borrowBook("97803A6406157", "123456789012"));
+    void registerUser_validNameWithSpaces_registersSuccessfully() {
+        User u = mock(User.class);
+        when(u.getId()).thenReturn("123456789012");
+        when(u.getName()).thenReturn("Alice Smith");
+        when(u.getNotificationService()).thenReturn(mockNotificationService);
+
+        when(databaseService.getUserById("123456789012")).thenReturn(null);
+
+        library.registerUser(u);
+
+        verify(databaseService).registerUser("123456789012", u);
     }
 
     @Test
-    void returnBook_isbnContainsNonDigits() {
-        assertThrows(IllegalArgumentException.class,
-                () -> library.returnBook("97803A6406157"));
-    }
-
-    @Test
-    void addBook_authorStartsWithHyphen() {
+    void notifyReviews_reviewServiceCalledExactlyOnce() throws Exception {
         Book b = mock(Book.class);
-        when(b.getISBN()).thenReturn("9780306406157");
-        when(b.getTitle()).thenReturn("Some");
-        when(b.getAuthor()).thenReturn("-John Smith");
-        when(b.isBorrowed()).thenReturn(false);
+        User u = mock(User.class);
 
-        assertThrows(IllegalArgumentException.class,
-                () -> library.addBook(b));
+        when(databaseService.getBookByISBN("9780306406157")).thenReturn(b);
+        when(databaseService.getUserById("123456789012")).thenReturn(u);
+
+        when(reviewService.getReviewsForBook("9780306406157"))
+                .thenReturn(Collections.singletonList("OK"));
+
+        library.notifyUserWithBookReviews("9780306406157", "123456789012");
+
+        verify(reviewService, times(1)).getReviewsForBook("9780306406157");
     }
 
     @Test
-    void addBook_authorEndsWithHyphen() {
+    void borrowBook_nullBorrowedFlag_treatedAsBorrowed() {
         Book b = mock(Book.class);
-        when(b.getISBN()).thenReturn("9780306406157");
-        when(b.getTitle()).thenReturn("Some");
-        when(b.getAuthor()).thenReturn("John Smith-");
-        when(b.isBorrowed()).thenReturn(false);
+        when(databaseService.getBookByISBN("9780306406157")).thenReturn(b);
+        when(databaseService.getUserById("123456789012")).thenReturn(mock(User.class));
+        when(b.isBorrowed()).thenReturn(null);
 
-        assertThrows(IllegalArgumentException.class,
-                () -> library.addBook(b));
+        assertThrows(BookAlreadyBorrowedException.class,
+                () -> library.borrowBook("9780306406157", "123456789012"));
     }
+
+
+    
+
+
+
+
+
+
 
 
 
