@@ -1,0 +1,16 @@
+# Exclude all XML files
+*.xml
+
+# IntelliJ IDEA specific files
+# Folders
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# Maven settings
+# target/
+
+# Gradle settings
+# .gradle/
+# build/
